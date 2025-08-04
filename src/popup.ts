@@ -7,6 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const exportTextButton = document.getElementById('exportText') as HTMLButtonElement;
   const copyTextButton = document.getElementById('copyText') as HTMLButtonElement;
   const scrollButton = document.getElementById('scroll-to-bottom') as HTMLButtonElement;
+  const scrollButtonText = scrollButton.querySelector('span');
+  const scrollIcon = scrollButton.querySelector('.icon-scroll') as HTMLElement;
+  const stopIcon = scrollButton.querySelector('.icon-stop') as HTMLElement;
 
   let comments = [];
   let currentTab;
@@ -122,17 +125,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  function setButtonScrollState(scrolling: boolean) {
+    isScrolling = scrolling;
+    scrollButtonText.textContent = isScrolling ? 'Stop Scrolling' : 'Auto-scroll';
+    scrollIcon.style.display = isScrolling ? 'none' : 'inline-block';
+    stopIcon.style.display = isScrolling ? 'inline-block' : 'none';
+    if (isScrolling) {
+        scrollButton.classList.add('scrolling');
+    } else {
+        scrollButton.classList.remove('scrolling');
+    }
+  }
+
   chrome.runtime.sendMessage({ type: 'get_scroll_state' }, (response) => {
-    if (response && response.isScrolling) {
-      isScrolling = true;
-      scrollButton.textContent = 'Stop Scrolling';
+    if (response) {
+        setButtonScrollState(response.isScrolling);
     }
   });
 
   scrollButton.addEventListener('click', () => {
-    isScrolling = !isScrolling;
-    scrollButton.textContent = isScrolling ? 'Stop Scrolling' : 'Auto-scroll';
-    chrome.runtime.sendMessage({ type: 'toggle_scroll', state: isScrolling });
+    const newState = !isScrolling;
+    setButtonScrollState(newState);
+    chrome.runtime.sendMessage({ type: 'toggle_scroll', state: newState });
   });
 
   reloadLink.addEventListener('click', () => {
