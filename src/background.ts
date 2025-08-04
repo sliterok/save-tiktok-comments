@@ -1,11 +1,8 @@
-import { sendPageDown } from "./helpers/keyboard";
-
-// Use a Map to store data per tabId: Map<number, { comments: any[] }>
 const tabsData = new Map();
-let scrollInterval;
-let scrollingTabId;
+const scrollingTabs = new Set<number>();
 
 const TIKTOK_COMMENT_API_PATTERN = '*://*.tiktok.com/api/comment/list*';
+
 
 function setupDebugger(tabId) {
     chrome.debugger.sendCommand({ tabId }, 'Network.enable', () => {
@@ -18,30 +15,13 @@ function setupDebugger(tabId) {
     });
 }
 
-function startScrolling(tabId: number) {
-  if (scrollInterval) return;
-  scrollingTabId = tabId;
-  scrollInterval = setInterval(() => {
-    if (tabsData.has(scrollingTabId)) {
-        sendPageDown(scrollingTabId);
-    } else {
-        stopScrolling();
-    }
-  }, 50);
-}
-
-function stopScrolling() {
-  clearInterval(scrollInterval);
-  scrollInterval = null;
-  scrollingTabId = null;
-}
-
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     const isTikTokUrl = tab.url && tab.url.includes('tiktok.com');
 
-    if (tabId === scrollingTabId && changeInfo.url) {
-        stopScrolling();
+    if (scrollingTabs.has(tabId) && changeInfo.url) {
+        scrollingTabs.delete(tabId);
     }
+
 
     // If the tab is not on TikTok, ensure we are detached.
     if (!isTikTokUrl) {
@@ -76,8 +56,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
-    if (tabId === scrollingTabId) {
-        stopScrolling();
+    if (scrollingTabs.has(tabId)) {
+        scrollingTabs.delete(tabId);
     }
     if (tabsData.has(tabId)) {
         chrome.debugger.detach({ tabId });
@@ -163,18 +143,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (tabs.length > 0) {
             const tabId = tabs[0].id;
             if (message.state) {
-                startScrolling(tabId);
+                scrollingTabs.add(tabId);
             } else {
-                stopScrolling();
+                scrollingTabs.delete(tabId);
             }
+            chrome.tabs.sendMessage(tabId, { type: 'toggle_scroll', state: message.state });
         }
     });
     return true;
   }
 
   if (message.type === 'get_scroll_state') {
-      sendResponse({ isScrolling: !!scrollInterval });
-      return true;
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs.length > 0) {
+            const tabId = tabs[0].id;
+            sendResponse({ isScrolling: scrollingTabs.has(tabId) });
+        } else {
+            sendResponse({ isScrolling: false });
+        }
+    });
+    return true;
   }
 });
 
