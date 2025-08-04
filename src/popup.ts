@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const countEl = document.getElementById('comment-count');
   const exportJsonButton = document.getElementById('exportJson') as HTMLButtonElement;
   const copyJsonButton = document.getElementById('copyJson') as HTMLButtonElement;
+  const exportTextButton = document.getElementById('exportText') as HTMLButtonElement;
   const copyTextButton = document.getElementById('copyText') as HTMLButtonElement;
   const scrollButton = document.getElementById('scroll-to-bottom') as HTMLButtonElement;
   const reloadButton = document.getElementById('reload-comments') as HTMLButtonElement;
@@ -33,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const hasComments = comments.length > 0;
         exportJsonButton.disabled = !hasComments;
         copyJsonButton.disabled = !hasComments;
+        exportTextButton.disabled = !hasComments;
         copyTextButton.disabled = !hasComments;
         scrollButton.disabled = false;
         reloadButton.style.display = hasComments ? 'none' : 'block';
@@ -41,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
         countEl.textContent = '';
         exportJsonButton.disabled = true;
         copyJsonButton.disabled = true;
+        exportTextButton.disabled = true;
         copyTextButton.disabled = true;
         scrollButton.disabled = true;
         reloadButton.style.display = 'none';
@@ -70,21 +73,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  exportJsonButton.addEventListener('click', () => {
-    if (comments.length > 0 && currentTab) {
-      const url = new URL(currentTab.url);
-      const pathParts = url.pathname.split('/').filter(p => p); // filter out empty strings
-      // expected path: /@username/video/videoid or /@username/photo/photoid
-      const username = pathParts[0].substring(1);
-      const videoId = pathParts[2];
-      const title = cleanTabTitle(currentTab.title).replace(/[^a-z0-9]/gi, '_').toLowerCase();
-      const filename = `${username}_${videoId}_${title}.json`;
+  function getFilename(extension) {
+    if (!currentTab) return `tiktok-comments.${extension}`;
+    const url = new URL(currentTab.url);
+    const pathParts = url.pathname.split('/').filter(p => p); // filter out empty strings
+    // expected path: /@username/video/videoid or /@username/photo/photoid
+    const username = pathParts[0].substring(1);
+    const videoId = pathParts[2];
+    const title = cleanTabTitle(currentTab.title).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    return `${username}_${videoId}_${title}.${extension}`;
+  }
 
+  exportJsonButton.addEventListener('click', () => {
+    if (comments.length > 0) {
       const blob = new Blob([JSON.stringify(comments, null, 2)], { type: 'application/json' });
       const blobUrl = URL.createObjectURL(blob);
       chrome.downloads.download({
         url: blobUrl,
-        filename: filename
+        filename: getFilename('json')
       }, () => URL.revokeObjectURL(blobUrl));
     }
   });
@@ -92,6 +98,19 @@ document.addEventListener('DOMContentLoaded', () => {
   copyJsonButton.addEventListener('click', () => {
     if (comments.length > 0) {
       navigator.clipboard.writeText(JSON.stringify(comments, null, 2));
+    }
+  });
+
+  exportTextButton.addEventListener('click', () => {
+    if (comments.length > 0) {
+      const commentTexts = comments.map(comment => comment.text.replace(/\n/g, ' '));
+      const textContent = commentTexts.join('\n');
+      const blob = new Blob([textContent], { type: 'text/plain' });
+      const blobUrl = URL.createObjectURL(blob);
+      chrome.downloads.download({
+        url: blobUrl,
+        filename: getFilename('txt')
+      }, () => URL.revokeObjectURL(blobUrl));
     }
   });
 
