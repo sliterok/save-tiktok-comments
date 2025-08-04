@@ -1,0 +1,19 @@
+{
+  "name": "tiktok-comments-ext",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "node esbuild.mjs"
+  },
+  "type": "module",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "esbuild": "^0.25.3"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.318"
+  }
+}
