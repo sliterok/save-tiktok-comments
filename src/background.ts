@@ -66,7 +66,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 // Handle intercepted network requests
-chrome.debugger.onEvent.addListener((source, method, params) => {
+chrome.debugger.onEvent.addListener((source, method, p) => {
+  const params = p as { interceptionId: string }
   if (method === 'Network.requestIntercepted' && tabsData.has(source.tabId)) {
     const { interceptionId } = params;
 
@@ -74,7 +75,8 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
       { tabId: source.tabId },
       'Network.getResponseBodyForInterception',
       { interceptionId },
-      (response) => {
+      (r) => {
+        const response = r as { body: string, base64Encoded: boolean }
         if (response && response.body) {
           try {
             let decodedBody;
