@@ -135,6 +135,63 @@
     button:disabled svg {
       fill: #a5adba !important;
     }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-color: #1d1d1d;
+        --text-color: #e6e6e6;
+        --text-color-light: #9a9a9a;
+        --primary-color: #00f2ea;
+        --primary-color-hover: #33fff3;
+        --danger-color: #ff4d4d;
+        --danger-color-hover: #ff6666;
+        --card-bg-color: #2c2c2c;
+        --border-color: #444444;
+        --shadow: 0 2px 8px rgba(0,0,0,0.3);
+      }
+
+      .button-container .main-action:hover {
+        background-color: #3a3a3a;
+      }
+
+      .button-container .side-action:hover {
+        background-color: #3a3a3a;
+      }
+
+      .button-container .side-action svg {
+        fill: var(--text-color-light);
+      }
+
+      #scroll-to-bottom {
+        background-color: var(--primary-color);
+        color: #000;
+      }
+
+      #scroll-to-bottom:hover {
+        background-color: var(--primary-color-hover);
+      }
+
+      #scroll-to-bottom svg {
+        fill: #000;
+      }
+
+      #scroll-to-bottom.scrolling {
+        color: white;
+      }
+
+      #scroll-to-bottom.scrolling svg {
+        fill: white;
+      }
+
+      button:disabled,
+      button:disabled:hover {
+        background-color: #2a2a2a !important;
+        color: #555 !important;
+      }
+
+      button:disabled svg {
+        fill: #555 !important;
+      }
+    }
   </style>
 </head>
 <body>
