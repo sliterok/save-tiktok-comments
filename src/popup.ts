@@ -1,12 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
   const titleEl = document.getElementById('tab-title');
-  const countEl = document.getElementById('comment-count');
+  const countEl = document.getElementById('comment-count').firstElementChild as HTMLSpanElement;
+  const reloadLink = document.getElementById('reload-link') as HTMLSpanElement;
   const exportJsonButton = document.getElementById('exportJson') as HTMLButtonElement;
   const copyJsonButton = document.getElementById('copyJson') as HTMLButtonElement;
   const exportTextButton = document.getElementById('exportText') as HTMLButtonElement;
   const copyTextButton = document.getElementById('copyText') as HTMLButtonElement;
   const scrollButton = document.getElementById('scroll-to-bottom') as HTMLButtonElement;
-  const reloadButton = document.getElementById('reload-comments') as HTMLButtonElement;
 
   let comments = [];
   let currentTab;
@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
         exportTextButton.disabled = !hasComments;
         copyTextButton.disabled = !hasComments;
         scrollButton.disabled = false;
-        reloadButton.style.display = hasComments ? 'none' : 'block';
+        reloadLink.style.display = hasComments ? 'none' : 'inline';
     } else {
         titleEl.textContent = 'Not a TikTok Video/Photo';
         countEl.textContent = '';
@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
         exportTextButton.disabled = true;
         copyTextButton.disabled = true;
         scrollButton.disabled = true;
-        reloadButton.style.display = 'none';
+        reloadLink.style.display = 'none';
     }
   }
 
@@ -135,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.runtime.sendMessage({ type: 'toggle_scroll', state: isScrolling });
   });
 
-  reloadButton.addEventListener('click', () => {
+  reloadLink.addEventListener('click', () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs.length > 0) {
         chrome.tabs.reload(tabs[0].id);
