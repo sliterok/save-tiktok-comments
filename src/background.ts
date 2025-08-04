@@ -4,51 +4,56 @@ const tabsData = new Map();
 const TIKTOK_COMMENT_API_PATTERN = '*://*.tiktok.com/api/comment/list*';
 
 function setupDebugger(tabId) {
-  chrome.debugger.sendCommand({ tabId }, 'Network.enable', () => {
-    if (chrome.runtime.lastError) return;
-    chrome.debugger.sendCommand(
-      { tabId },
-      'Network.setRequestInterception',
-      { patterns: [{ urlPattern: TIKTOK_COMMENT_API_PATTERN, interceptionStage: 'HeadersReceived' }] }
-    );
-  });
+    chrome.debugger.sendCommand({ tabId }, 'Network.enable', () => {
+        if (chrome.runtime.lastError) return;
+        chrome.debugger.sendCommand(
+            { tabId },
+            'Network.setRequestInterception',
+            { patterns: [{ urlPattern: TIKTOK_COMMENT_API_PATTERN, interceptionStage: 'HeadersReceived' }] }
+        );
+    });
 }
 
-function attachDebugger(tabId) {
-  if (tabsData.has(tabId)) return; // Already tracking this tab
-
-  chrome.debugger.attach({ tabId }, '1.2', () => {
-    if (chrome.runtime.lastError) {
-      console.error(`Attach failed for tab ${tabId}: ${chrome.runtime.lastError.message}`);
-      return;
-    }
-    tabsData.set(tabId, { comments: [] });
-    setupDebugger(tabId);
-  });
-}
-
-function detachDebugger(tabId) {
-  if (!tabsData.has(tabId)) return;
-  
-  chrome.debugger.detach({ tabId: tabId }, () => {
-    tabsData.delete(tabId);
-  });
-}
-
-// Attach to existing and new TikTok tabs
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (tab.url && tab.url.includes('tiktok.com')) {
-    if (changeInfo.status === 'complete') {
-      attachDebugger(tabId);
+    const isTikTokUrl = tab.url && tab.url.includes('tiktok.com');
+
+    // If the tab is not on TikTok, ensure we are detached.
+    if (!isTikTokUrl) {
+        if (tabsData.has(tabId)) {
+            chrome.debugger.detach({ tabId });
+            tabsData.delete(tabId);
+        }
+        return;
     }
-  } else {
-    detachDebugger(tabId);
-  }
+
+    // The tab is on TikTok.
+    if (!tabsData.has(tabId)) {
+        // If we aren't tracking this tab, attach the debugger.
+        // This handles new tabs, restored tabs, and navigations from other sites.
+        chrome.debugger.attach({ tabId }, '1.2', () => {
+            if (chrome.runtime.lastError) {
+                // e.g., another debugger is already attached.
+                return;
+            }
+            tabsData.set(tabId, { comments: [] });
+            setupDebugger(tabId);
+        });
+    } else {
+        // We are already tracking this tab. If the URL changed, it's a new video.
+        if (changeInfo.url) {
+            const tabData = tabsData.get(tabId);
+            if (tabData) {
+                tabData.comments = [];
+            }
+        }
+    }
 });
 
-// Clean up when a tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
-  detachDebugger(tabId);
+    if (tabsData.has(tabId)) {
+        chrome.debugger.detach({ tabId });
+        tabsData.delete(tabId);
+    }
 });
 
 // Handle intercepted network requests
@@ -66,11 +71,13 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
             const data = JSON.parse(response.base64Encoded ? atob(response.body) : response.body);
             if (data && data.comments) {
               const tabData = tabsData.get(source.tabId);
-              const existingCids = new Set(tabData.comments.map(c => c.cid));
-              const newComments = data.comments.filter(c => !existingCids.has(c.cid));
-              
-              if (newComments.length > 0) {
-                tabData.comments.push(...newComments);
+              if (tabData) {
+                  const existingCids = new Set(tabData.comments.map(c => c.cid));
+                  const newComments = data.comments.filter(c => !existingCids.has(c.cid));
+                  
+                  if (newComments.length > 0) {
+                    tabData.comments.push(...newComments);
+                  }
               }
             }
           } catch (e) {
@@ -81,7 +88,6 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
       }
     );
   } else if (params.interceptionId) {
-    // Ensure any other intercepted requests are continued
     chrome.debugger.sendCommand({ tabId: source.tabId }, 'Network.continueInterceptedRequest', { interceptionId: params.interceptionId });
   }
 });
@@ -105,9 +111,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Initial check on startup
+// Initial check on startup for already-open tabs
 chrome.tabs.query({ url: '*://*.tiktok.com/*' }, (tabs) => {
   for (const tab of tabs) {
-    attachDebugger(tab.id);
+    if (!tabsData.has(tab.id)) {
+        chrome.debugger.attach({ tabId: tab.id }, '1.2', () => {
+            if (chrome.runtime.lastError) return;
+            tabsData.set(tab.id, { comments: [] });
+            setupDebugger(tab.id);
+        });
+    }
   }
 });
