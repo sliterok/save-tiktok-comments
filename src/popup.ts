@@ -4,8 +4,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const exportJsonButton = document.getElementById('exportJson') as HTMLButtonElement;
   const copyJsonButton = document.getElementById('copyJson') as HTMLButtonElement;
   const copyTextButton = document.getElementById('copyText') as HTMLButtonElement;
+  const scrollButton = document.getElementById('scroll-to-bottom') as HTMLButtonElement;
+  const reloadButton = document.getElementById('reload-comments') as HTMLButtonElement;
 
   let comments = [];
+  let currentTab;
+  let isScrolling = false;
 
   function cleanTabTitle(title) {
     if (!title) return 'No title';
@@ -13,37 +17,75 @@ document.addEventListener('DOMContentLoaded', () => {
     return title.replace(/^\(\d+\)\s*/, '').replace(/\s*\|\s*TikTok$/, '').trim();
   }
 
-  function updateUI(retrievedComments, tabTitle) {
+  function updateUI(retrievedComments, tab) {
     comments = retrievedComments || [];
-    const cleanedTitle = cleanTabTitle(tabTitle);
-    titleEl.textContent = cleanedTitle || 'No TikTok tab active';
-    titleEl.title = cleanedTitle || 'No TikTok tab active';
-    countEl.textContent = `${comments.length} comments captured`;
+    currentTab = tab;
 
-    const hasComments = comments.length > 0;
-    exportJsonButton.disabled = !hasComments;
-    copyJsonButton.disabled = !hasComments;
-    copyTextButton.disabled = !hasComments;
+    const isTikTok = tab && tab.url && tab.url.includes('tiktok.com');
+    const isVideoOrPhoto = isTikTok && (tab.url.includes('/video/') || tab.url.includes('/photo/'));
+
+    if (isVideoOrPhoto) {
+        const cleanedTitle = cleanTabTitle(tab.title);
+        titleEl.textContent = cleanedTitle;
+        titleEl.title = cleanedTitle;
+        countEl.textContent = `${comments.length} comments captured`;
+
+        const hasComments = comments.length > 0;
+        exportJsonButton.disabled = !hasComments;
+        copyJsonButton.disabled = !hasComments;
+        copyTextButton.disabled = !hasComments;
+        scrollButton.disabled = false;
+        reloadButton.style.display = hasComments ? 'none' : 'block';
+    } else {
+        titleEl.textContent = 'Not a TikTok Video/Photo';
+        countEl.textContent = '';
+        exportJsonButton.disabled = true;
+        copyJsonButton.disabled = true;
+        copyTextButton.disabled = true;
+        scrollButton.disabled = true;
+        reloadButton.style.display = 'none';
+    }
   }
 
   // Request data from the background script when the popup is opened
   chrome.runtime.sendMessage({ type: 'get_popup_data' }, (response) => {
     if (chrome.runtime.lastError) {
       console.error(chrome.runtime.lastError.message);
-      updateUI([], 'Error loading data');
+      updateUI([], null);
       return;
     }
-    updateUI(response.comments, response.title);
+    updateUI(response.comments, response.tab);
+  });
+
+  // Listen for messages from the background script
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'comments_updated') {
+      chrome.runtime.sendMessage({ type: 'get_popup_data' }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error(chrome.runtime.lastError.message);
+          return;
+        }
+        updateUI(response.comments, response.tab);
+      });
+    }
   });
 
   exportJsonButton.addEventListener('click', () => {
-    if (comments.length > 0) {
+    if (comments.length > 0 && currentTab) {
+      const url = new URL(currentTab.url);
+      const pathParts = url.pathname.split('/').filter(p => p); // filter out empty strings
+      // expected path: /@username/video/videoid or /@username/photo/photoid
+      const username = pathParts[0].substring(1);
+      const videoId = pathParts[2];
+      const title = cleanTabTitle(currentTab.title).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      const filename = `${username}_${videoId}_${title}.json`;
+
       const blob = new Blob([JSON.stringify(comments, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      const blobUrl = URL.createObjectURL(blob);
       chrome.downloads.download({
-        url: url,
-        filename: 'tiktok-comments.json'
-      }, () => URL.revokeObjectURL(url));
+        url: blobUrl,
+        filename: filename
+      }, () => URL.revokeObjectURL(blobUrl));
     }
   });
 
@@ -59,5 +101,27 @@ document.addEventListener('DOMContentLoaded', () => {
       const textContent = commentTexts.join('\n');
       navigator.clipboard.writeText(textContent);
     }
+  });
+
+  chrome.runtime.sendMessage({ type: 'get_scroll_state' }, (response) => {
+    if (response && response.isScrolling) {
+      isScrolling = true;
+      scrollButton.textContent = 'Stop Scrolling';
+    }
+  });
+
+  scrollButton.addEventListener('click', () => {
+    isScrolling = !isScrolling;
+    scrollButton.textContent = isScrolling ? 'Stop Scrolling' : 'Auto-scroll';
+    chrome.runtime.sendMessage({ type: 'toggle_scroll', state: isScrolling });
+  });
+
+  reloadButton.addEventListener('click', () => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs.length > 0) {
+        chrome.tabs.reload(tabs[0].id);
+        window.close();
+      }
+    });
   });
 });

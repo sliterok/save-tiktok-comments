@@ -1,5 +1,9 @@
+import { sendPageDown } from "./helpers/keyboard";
+
 // Use a Map to store data per tabId: Map<number, { comments: any[] }>
 const tabsData = new Map();
+let scrollInterval;
+let scrollingTabId;
 
 const TIKTOK_COMMENT_API_PATTERN = '*://*.tiktok.com/api/comment/list*';
 
@@ -14,8 +18,30 @@ function setupDebugger(tabId) {
     });
 }
 
+function startScrolling(tabId: number) {
+  if (scrollInterval) return;
+  scrollingTabId = tabId;
+  scrollInterval = setInterval(() => {
+    if (tabsData.has(scrollingTabId)) {
+        sendPageDown(scrollingTabId);
+    } else {
+        stopScrolling();
+    }
+  }, 50);
+}
+
+function stopScrolling() {
+  clearInterval(scrollInterval);
+  scrollInterval = null;
+  scrollingTabId = null;
+}
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     const isTikTokUrl = tab.url && tab.url.includes('tiktok.com');
+
+    if (tabId === scrollingTabId && changeInfo.url) {
+        stopScrolling();
+    }
 
     // If the tab is not on TikTok, ensure we are detached.
     if (!isTikTokUrl) {
@@ -50,6 +76,9 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
+    if (tabId === scrollingTabId) {
+        stopScrolling();
+    }
     if (tabsData.has(tabId)) {
         chrome.debugger.detach({ tabId });
         tabsData.delete(tabId);
@@ -92,6 +121,10 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
                   
                   if (newComments.length > 0) {
                     tabData.comments.push(...newComments);
+                    chrome.runtime.sendMessage({
+                      type: 'comments_updated',
+                      count: tabData.comments.length
+                    });
                   }
               }
             }
@@ -115,14 +148,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const tab = tabs[0];
         const data = tabsData.get(tab.id);
         sendResponse({
-          title: tab.title,
+          tab: tab,
           comments: data ? data.comments : []
         });
       } else {
-        sendResponse({ title: 'No active tab found', comments: [] });
+        sendResponse({ tab: null, comments: [] });
       }
     });
     return true; // Indicates async response
+  }
+
+  if (message.type === 'toggle_scroll') {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs.length > 0) {
+            const tabId = tabs[0].id;
+            if (message.state) {
+                startScrolling(tabId);
+            } else {
+                stopScrolling();
+            }
+        }
+    });
+    return true;
+  }
+
+  if (message.type === 'get_scroll_state') {
+      sendResponse({ isScrolling: !!scrollInterval });
+      return true;
   }
 });
 
