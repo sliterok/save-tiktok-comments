@@ -4,16 +4,19 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "node esbuild.mjs"
+    "build": "node esbuild.mjs",
+    "package": "node package.mjs"
   },
-  "type": "module",
   "keywords": [],
   "author": "",
+  "type": "module",
   "license": "ISC",
   "dependencies": {
     "esbuild": "^0.25.3"
   },
   "devDependencies": {
-    "@types/chrome": "^0.0.318"
+    "@types/chrome": "^0.0.318",
+    "@types/zip-stream": "^7.0.0",
+    "zip-stream": "^7.0.2"
   }
 }
