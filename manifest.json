@@ -4,10 +4,8 @@
   "version": "1.0.0",
   "description": "Export comments from TikTok videos.",
   "permissions": [
-    "storage",
     "debugger",
     "tabs",
-    "scripting",
     "downloads"
   ],
   "host_permissions": [
