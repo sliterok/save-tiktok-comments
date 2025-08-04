@@ -68,7 +68,22 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
       (response) => {
         if (response && response.body) {
           try {
-            const data = JSON.parse(response.base64Encoded ? atob(response.body) : response.body);
+            let decodedBody;
+            if (response.base64Encoded) {
+                // Decode base64 to a binary string
+                const binaryString = atob(response.body);
+                // Convert the binary string to a byte array
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                // Decode the byte array as UTF-8
+                decodedBody = new TextDecoder('utf-8').decode(bytes);
+            } else {
+                decodedBody = response.body;
+            }
+
+            const data = JSON.parse(decodedBody);
             if (data && data.comments) {
               const tabData = tabsData.get(source.tabId);
               if (tabData) {

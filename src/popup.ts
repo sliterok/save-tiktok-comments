@@ -7,10 +7,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let comments = [];
 
+  function cleanTabTitle(title) {
+    if (!title) return 'No title';
+    // Remove notification count like (1), (2), etc., and the "| TikTok" suffix.
+    return title.replace(/^\(\d+\)\s*/, '').replace(/\s*\|\s*TikTok$/, '').trim();
+  }
+
   function updateUI(retrievedComments, tabTitle) {
     comments = retrievedComments || [];
-    titleEl.textContent = tabTitle || 'No TikTok tab active';
-    titleEl.title = tabTitle || 'No TikTok tab active';
+    const cleanedTitle = cleanTabTitle(tabTitle);
+    titleEl.textContent = cleanedTitle || 'No TikTok tab active';
+    titleEl.title = cleanedTitle || 'No TikTok tab active';
     countEl.textContent = `${comments.length} comments captured`;
 
     const hasComments = comments.length > 0;
